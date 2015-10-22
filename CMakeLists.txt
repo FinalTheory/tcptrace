@@ -82,13 +82,7 @@ add_definitions(
         -DLOAD_MODULE_RTTGRAPH
         -DLOAD_MODULE_COLLIE
         -DLOAD_MODULE_REALTIME
-        -DGROK_SNOOP
         -DGROK_TCPDUMP
-        -DGROK_NETM
-        -DGROK_ETHERPEEK
-        -DGROK_NS
-        -DGROK_NETSCOUT
-        -DGROK_ERF
         -DYYTEXT_POINTER=1
         -DHAVE_LIBM=1
         -DSTDC_HEADERS=1
@@ -118,7 +112,9 @@ add_definitions(
 
 include_directories(.)
 
-add_executable(tcptrace ${SOURCE_FILES})
-add_executable(versnum versnum.c)
+add_library(cJSON STATIC cJSON/cJSON.c)
 
-target_link_libraries(tcptrace pcap m)
+add_executable(tcptrace ${SOURCE_FILES})
+target_link_libraries(tcptrace pcap m cJSON)
+
+add_executable(versnum versnum.c)
