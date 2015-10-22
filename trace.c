@@ -60,7 +60,7 @@ static char const GCC_UNUSED rcsid[] =
 
 
 #include "gcache.h"
-
+#include "cJSON/cJSON.h"
 
 /* locally global variables */
 static int tcp_packet_count = 0;
@@ -2603,7 +2603,18 @@ trace_done(void)
 	 }
       }
     }
-   
+    if (dump_json) {
+        cJSON * DumpJson(tcp_pair *ptp);
+        cJSON *array = cJSON_CreateArray();
+        for (ix = 0; ix <= num_tcp_pairs; ++ix) {
+            ptp = ttp[ix];
+            cJSON_AddItemToArray(array, DumpJson(ptp));
+        }
+        char *raw_json = cJSON_Print(array);
+        FILE *fp = fopen("connections.json", "w");
+        fwrite(raw_json, 1, strlen(raw_json), fp);
+        fclose(fp);
+    }
   if (!run_continuously) {
     /* print each connection */
     if (!printsuppress) {

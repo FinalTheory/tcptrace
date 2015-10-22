@@ -53,6 +53,7 @@
  *		http://www.tcptrace.org/
  */
 #include "tcptrace.h"
+#include "cJSON/cJSON.h"
 static char const GCC_UNUSED copyright[] =
     "@(#)Copyright (c) 2004 -- Ohio University.\n";
 static char const GCC_UNUSED rcsid[] =
@@ -193,8 +194,318 @@ FormatBrief(
 }
 
 
+cJSON *
+CreateValueUnitPair(double value, char *name) {
+    cJSON *array = cJSON_CreateArray();
+    cJSON_AddItemToArray(array, cJSON_CreateNumber(value));
+    cJSON_AddItemToArray(array, cJSON_CreateString(name));
+    return array;
+}
+
+void
+InsertJsonNumber(cJSON *node_a2b, cJSON *node_b2a, char *name, char *unit, double a2b, double b2a) {
+    cJSON_AddItemToObject(node_a2b, name, CreateValueUnitPair(a2b, unit));
+    cJSON_AddItemToObject(node_b2a, name, CreateValueUnitPair(b2a, unit));
+}
+
+void
+InsertJsonBool(cJSON *node_a2b, cJSON *node_b2a, char *name, char *unit, int a2b, int b2a) {
+    cJSON_AddBoolToObject(node_a2b, name, a2b);
+    cJSON_AddBoolToObject(node_b2a, name, b2a);
+}
+
+cJSON *
+DumpJson(tcp_pair *ptp) {
+    double etime;
+    double etime_data1;
+    double etime_data2;
+    tcb *pab = &ptp->a2b;
+    tcb *pba = &ptp->b2a;
+    cJSON *json_root = cJSON_CreateObject();
+
+    u_llong stream_length_pab = 0, stream_length_pba = 0;
+    u_long pab_last, pba_last;
+
+    /* calculate elapsed time */
+    etime = elapsed(ptp->first_time, ptp->last_time);
+    cJSON_AddStringToObject(json_root, "filename", ptp->filename);
+    cJSON_AddStringToObject(json_root, "host_a", ptp->a_hostname);
+    cJSON_AddStringToObject(json_root, "host_b", ptp->b_hostname);
+    cJSON_AddStringToObject(json_root, "port_a", ptp->a_portname);
+    cJSON_AddStringToObject(json_root, "port_b", ptp->b_portname);
+    cJSON_AddStringToObject(json_root, "complete",
+                            ConnReset(ptp) ? "reset" : (ConnComplete(ptp) ? "yes" : "no"));
+
+    cJSON_AddNumberToObject(json_root, "SYNs", SynCount(ptp));
+    cJSON_AddNumberToObject(json_root, "FINs", FinCount(ptp));
+    cJSON_AddNumberToObject(json_root, "first_packet_time",
+                            (ptp->first_time.tv_sec + ptp->first_time.tv_usec / 1000000.));
+    cJSON_AddNumberToObject(json_root, "last_packet_time",
+                            (ptp->last_time.tv_sec + ptp->last_time.tv_usec / 1000000.));
+    cJSON_AddNumberToObject(json_root, "elapsed_time", (etime / 1000000.0));
+    cJSON_AddNumberToObject(json_root, "total_packets", (ptp->packets));
 
 
+    // store information of sub connections
+    cJSON *node_a2b = cJSON_CreateObject();
+    cJSON *node_b2a = cJSON_CreateObject();
+    cJSON_AddItemToObject(json_root, "a2b", node_a2b);
+    cJSON_AddItemToObject(json_root, "b2a", node_b2a);
+
+    if (graph_tput) {
+        cJSON_AddItemToObject(node_a2b, "time", pab->thru_time_data);
+        cJSON_AddItemToObject(node_a2b, "average", pab->thru_avg_data);
+        cJSON_AddItemToObject(node_a2b, "instant", pab->thru_inst_data);
+        cJSON_AddItemToObject(node_a2b, "points_data", pab->thru_points_data);
+        cJSON_AddItemToObject(node_a2b, "points_time", pab->thru_points_time);
+
+        cJSON_AddItemToObject(node_b2a, "time", pba->thru_time_data);
+        cJSON_AddItemToObject(node_b2a, "average", pba->thru_avg_data);
+        cJSON_AddItemToObject(node_b2a, "instant", pba->thru_inst_data);
+        cJSON_AddItemToObject(node_b2a, "points_data", pba->thru_points_data);
+        cJSON_AddItemToObject(node_b2a, "points_time", pba->thru_points_time);
+    }
+
+    InsertJsonNumber(node_a2b, node_b2a, "packets_sent", "", pab->packets, pba->packets);
+    InsertJsonNumber(node_a2b, node_b2a, "resets_sent", "", pab->reset_count, pba->reset_count);
+    InsertJsonNumber(node_a2b, node_b2a, "ack_pkts_sent", "", pab->ack_pkts, pba->ack_pkts);
+    InsertJsonNumber(node_a2b, node_b2a, "pure_acks_sent", "", pab->pureack_pkts, pba->pureack_pkts);
+    InsertJsonNumber(node_a2b, node_b2a, "sack_pkts_sent", "", pab->num_sacks, pba->num_sacks);
+    InsertJsonNumber(node_a2b, node_b2a, "dsack_pkts_sent", "", pab->num_dsacks, pba->num_dsacks);
+    InsertJsonNumber(node_a2b, node_b2a, "max_sack_blks_ack", "", pab->max_sack_blocks, pba->max_sack_blocks);
+    InsertJsonNumber(node_a2b, node_b2a, "unique_bytes_sent", "", pab->unique_bytes, pba->unique_bytes);
+    InsertJsonNumber(node_a2b, node_b2a, "actual_data_pkts", "", pab->data_pkts, pba->data_pkts);
+    InsertJsonNumber(node_a2b, node_b2a, "actual_data_bytes", "", pab->data_bytes, pba->data_bytes);
+    InsertJsonNumber(node_a2b, node_b2a, "rexmt_data_pkts", "", pab->rexmit_pkts, pba->rexmit_pkts);
+    InsertJsonNumber(node_a2b, node_b2a, "rexmt_data_bytes", "", pab->rexmit_bytes, pba->rexmit_bytes);
+    InsertJsonNumber(node_a2b, node_b2a, "zwnd_probe_pkts", "", pab->num_zwnd_probes, pba->num_zwnd_probes);
+    InsertJsonNumber(node_a2b, node_b2a, "zwnd_probe_bytes", "", pab->zwnd_probe_bytes, pba->zwnd_probe_bytes);
+    InsertJsonNumber(node_a2b, node_b2a, "outoforder_pkts", "", pab->out_order_pkts, pba->out_order_pkts);
+    InsertJsonNumber(node_a2b, node_b2a, "pushed_data_pkts", "", pab->data_pkts_push, pba->data_pkts_push);
+    InsertJsonNumber(node_a2b, node_b2a, "SYN_pkts_sent", "", pab->syn_count, pba->syn_count);
+    InsertJsonNumber(node_a2b, node_b2a, "FIN_pkts_sent", "", pab->fin_count, pba->fin_count);
+
+    InsertJsonBool(node_a2b, node_b2a, "req_1323_ws", "bool", pab->f1323_ws, pba->f1323_ws);
+    InsertJsonBool(node_a2b, node_b2a, "req_1323_ts", "bool", pab->f1323_ts, pba->f1323_ts);
+    if (pab->f1323_ws || pba->f1323_ws) {
+        InsertJsonNumber(node_a2b, node_b2a, "adv_wind_scale", "",
+                         (u_long)pab->window_scale, (u_long)pba->window_scale);
+    }
+    if (pab->fsack_req || pba->fsack_req) {
+        InsertJsonBool(node_a2b, node_b2a, "req_sack", "bool", pab->fsack_req, pba->fsack_req);
+        InsertJsonNumber(node_a2b, node_b2a, "sacks_sent", "",
+                         pab->sacks_sent,
+                         pba->sacks_sent);
+    }
+    InsertJsonNumber(node_a2b, node_b2a, "urgent_data_pkts", "pkts", pab->urg_data_pkts, pba->urg_data_pkts);
+    InsertJsonNumber(node_a2b, node_b2a, "urgent_data_bytes", "bytes", pab->urg_data_bytes, pba->urg_data_bytes);
+    InsertJsonNumber(node_a2b, node_b2a, "mss_requested", "bytes", pab->mss, pba->mss);
+    InsertJsonNumber(node_a2b, node_b2a, "max_segm_size", "bytes", pab->max_seg_size, pba->max_seg_size);
+    InsertJsonNumber(node_a2b, node_b2a, "min_segm_size", "bytes", pab->min_seg_size, pba->min_seg_size);
+    InsertJsonNumber(node_a2b, node_b2a, "avg_segm_size", "bytes",
+                     (int)((double)pab->data_bytes / ((double)pab->data_pkts + .001)),
+                     (int)((double)pba->data_bytes / ((double)pba->data_pkts + .001)));
+    InsertJsonNumber(node_a2b, node_b2a, "max_win_adv", "bytes", pab->win_max, pba->win_max);
+    InsertJsonNumber(node_a2b, node_b2a, "min_win_adv", "bytes", pab->win_min, pba->win_min);
+    InsertJsonNumber(node_a2b, node_b2a, "zero_win_adv", "times", pab->win_zero_ct, pba->win_zero_ct);
+    // Average window advertisement is calculated only for window scaled pkts
+    // if we have seen this connection using window scaling.
+    // Otherwise, it is just the regular way of dividing the sum of
+    // all window advertisements by the total number of packets.
+
+    if (pab->window_stats_updated_for_scaling &&
+        pba->window_stats_updated_for_scaling) {
+        InsertJsonNumber(node_a2b, node_b2a, "avg_win_adv", "bytes",
+                         pab->win_scaled_pkts == 0 ? 0 :
+                         (pab->win_tot / pab->win_scaled_pkts),
+                         pba->win_scaled_pkts == 0 ? 0 :
+                         (pba->win_tot / pba->win_scaled_pkts));
+    } else {
+        InsertJsonNumber(node_a2b, node_b2a, "avg_win_adv", "bytes",
+                         pab->packets == 0 ? 0 : pab->win_tot / pab->packets,
+                         pba->packets == 0 ? 0 : pba->win_tot / pba->packets);
+    }
+
+    InsertJsonNumber(node_a2b, node_b2a, "max_owin", "bytes", pab->owin_max, pba->owin_max);
+    InsertJsonNumber(node_a2b, node_b2a, "min_non-zero_owin", "bytes", pab->owin_min, pba->owin_min);
+    InsertJsonNumber(node_a2b, node_b2a, "avg_owin", "bytes",
+                     pab->owin_count == 0 ? 0 : pab->owin_tot / pab->owin_count,
+                     pba->owin_count == 0 ? 0 : pba->owin_tot / pba->owin_count);
+    InsertJsonNumber(node_a2b, node_b2a, "wavg_owin", "bytes",
+                     (u_llong)(pab->owin_wavg / (etime / 1000000.)),
+                     (u_llong)(pba->owin_wavg / (etime / 1000000.)));
+
+    InsertJsonNumber(node_a2b, node_b2a, "initial_window", "bytes",
+                     pab->initialwin_bytes, pba->initialwin_bytes);
+    InsertJsonNumber(node_a2b, node_b2a, "initial_window", "pkts",
+                     pab->initialwin_segs, pba->initialwin_segs);
+
+    /* compare to theoretical length of the stream (not just what
+       we saw) using the SYN and FIN
+     * Seq. Space wrap around calculations:
+     * Calculate stream length using last_seq_num seen, first_seq_num
+     * seen and wrap_count.
+     * first_seq_num = syn
+     * If reset_set, last_seq_num = latest_seq
+     *          else last_seq_num = fin
+     */
+
+    pab_last = (pab->reset_count > 0) ? pab->latest_seq : pab->fin;
+
+    pba_last = (pba->reset_count > 0) ? pba->latest_seq : pba->fin;
+
+    /* calculating stream length for direction pab */
+    if ((pab->syn_count > 0) && (pab->fin_count > 0)) {
+        if (pab->seq_wrap_count > 0) {
+            if (pab_last > pab->syn) {
+                stream_length_pab = pab_last + (MAX_32 * pab->seq_wrap_count) - pab->syn - 1;
+            }
+            else {
+                stream_length_pab = pab_last + (MAX_32 * (pab->seq_wrap_count + 1)) - pab->syn - 1;
+            }
+        }
+        else {
+            if (pab_last > pab->syn) {
+                stream_length_pab = pab_last - pab->syn - 1;
+            }
+            else {
+                stream_length_pab = MAX_32 + pab_last - pab->syn - 1;
+            }
+        }
+    }
+
+    /* calculating stream length for direction pba */
+    if ((pba->syn_count > 0) && (pba->fin_count > 0)) {
+        if (pba->seq_wrap_count > 0) {
+            if (pba_last > pba->syn) {
+                stream_length_pba = pba_last + (MAX_32 * pba->seq_wrap_count) - pba->syn - 1;
+            }
+            else {
+                stream_length_pba = pba_last + (MAX_32 * (pba->seq_wrap_count + 1)) - pba->syn - 1;
+            }
+        }
+        else {
+            if (pba_last > pba->syn) {
+                stream_length_pba = pba_last - pba->syn - 1;
+            }
+            else {
+                stream_length_pba = MAX_32 + pba_last - pba->syn - 1;
+            }
+        }
+    }
+
+    InsertJsonNumber(node_a2b, node_b2a, "ttl_stream_length", "bytes",
+                     stream_length_pab, stream_length_pba);
+
+    InsertJsonNumber(node_a2b, node_b2a, "missed_data", "bytes",
+                     (stream_length_pab - pab->unique_bytes),
+                     (stream_length_pba - pba->unique_bytes));
+
+    /* tell how much data was NOT captured in the files */
+    InsertJsonNumber(node_a2b, node_b2a, "truncated_data", "bytes",
+                     pab->trunc_bytes, pba->trunc_bytes);
+    InsertJsonNumber(node_a2b, node_b2a, "truncated_packets", "pkts",
+                     pab->trunc_segs, pba->trunc_segs);
+
+    /* stats on just the data */
+    etime_data1 = elapsed(pab->first_data_time,
+                          pab->last_data_time); /* in usecs */
+    etime_data2 = elapsed(pba->first_data_time,
+                          pba->last_data_time); /* in usecs */
+
+    InsertJsonNumber(node_a2b, node_b2a, "data_xmit_time", "secs",
+                     etime_data1 / 1000000.0,
+                     etime_data2 / 1000000.0);
+
+    InsertJsonNumber(node_a2b, node_b2a, "idletime_max", "ms",
+                     (double)pab->idle_max / 1000.0,
+                     (double)pba->idle_max / 1000.0);
+
+    InsertJsonNumber(node_a2b, node_b2a, "hardware_dups", "segs",
+                     pab->num_hardware_dups, pba->num_hardware_dups);
+
+    /* do the throughput calcs */
+    etime /= 1000000.0;  /* convert to seconds */
+    InsertJsonNumber(node_a2b, node_b2a, "throughput", "Bps",
+                     (double)(pab->unique_bytes) / etime,
+                     (double)(pba->unique_bytes) / etime);
+
+    InsertJsonNumber(node_a2b, node_b2a, "RTT_samples", "", pab->rtt_count, pba->rtt_count);
+    InsertJsonNumber(node_a2b, node_b2a, "RTT_min", "ms",
+                     (double)pab->rtt_min / 1000.0,
+                     (double)pba->rtt_min / 1000.0);
+    InsertJsonNumber(node_a2b, node_b2a, "RTT_max", "ms",
+                     (double)pab->rtt_max / 1000.0,
+                     (double)pba->rtt_max / 1000.0);
+    InsertJsonNumber(node_a2b, node_b2a, "RTT_avg", "ms",
+                     Average(pab->rtt_sum, (int)pab->rtt_count) / 1000.0,
+                     Average(pba->rtt_sum, (int)pba->rtt_count) / 1000.0);
+    InsertJsonNumber(node_a2b, node_b2a, "RTT_stdev", "ms",
+                     Stdev(pab->rtt_sum, pab->rtt_sum2, (int)pab->rtt_count) / 1000.0,
+                     Stdev(pba->rtt_sum, pba->rtt_sum2, (int)pba->rtt_count) / 1000.0);
+    InsertJsonNumber(node_a2b, node_b2a, "RTT_from_3WHS", "ms",
+                     (double)pab->rtt_3WHS / 1000.0,
+                     (double)pba->rtt_3WHS / 1000.0);
+    InsertJsonNumber(node_a2b, node_b2a, "RTT_full_sz_smpls", "",
+                     pab->rtt_full_count, pba->rtt_full_count);
+    InsertJsonNumber(node_a2b, node_b2a, "RTT_full_sz_min", "ms",
+                     (double)pab->rtt_full_min / 1000.0,
+                     (double)pba->rtt_full_min / 1000.0);
+    InsertJsonNumber(node_a2b, node_b2a, "RTT_full_sz_max", "ms",
+                     (double)pab->rtt_full_max / 1000.0,
+                     (double)pba->rtt_full_max / 1000.0);
+    InsertJsonNumber(node_a2b, node_b2a, "RTT_full_sz_avg", "ms",
+                     Average(pab->rtt_full_sum, (int)pab->rtt_full_count) / 1000.0,
+                     Average(pba->rtt_full_sum, (int)pba->rtt_full_count) / 1000.0);
+    InsertJsonNumber(node_a2b, node_b2a, "RTT_full_sz_stdev", "ms",
+                     Stdev(pab->rtt_full_sum, pab->rtt_full_sum2, (int)pab->rtt_full_count) / 1000.0,
+                     Stdev(pba->rtt_full_sum, pba->rtt_full_sum2, (int)pba->rtt_full_count) / 1000.0);
+    InsertJsonNumber(node_a2b, node_b2a, "post-loss_acks", "",
+                     pab->rtt_nosample, pba->rtt_nosample);
+    if (pab->rtt_amback || pba->rtt_amback || csv || tsv || (sv != NULL)) {
+        InsertJsonNumber(node_a2b, node_b2a, "ambiguous_acks", "",
+                         pab->rtt_amback, pba->rtt_amback);
+        InsertJsonNumber(node_a2b, node_b2a, "RTT_min_last", "ms",
+                         (double)pab->rtt_min_last / 1000.0,
+                         (double)pba->rtt_min_last / 1000.0);
+        InsertJsonNumber(node_a2b, node_b2a, "RTT_max_last", "ms",
+                         (double)pab->rtt_max_last / 1000.0,
+                         (double)pba->rtt_max_last / 1000.0);
+        InsertJsonNumber(node_a2b, node_b2a, "RTT_avg_last", "ms",
+                         Average(pab->rtt_sum_last, (int)pab->rtt_count_last) / 1000.0,
+                         Average(pba->rtt_sum_last, (int)pba->rtt_count_last) / 1000.0);
+        InsertJsonNumber(node_a2b, node_b2a, "RTT_sdv_last", "ms",
+                         Stdev(pab->rtt_sum_last, pab->rtt_sum2_last, (int)pab->rtt_count_last) / 1000.0,
+                         Stdev(pba->rtt_sum_last, pba->rtt_sum2_last, (int)pba->rtt_count_last) / 1000.0);
+
+    }
+    InsertJsonNumber(node_a2b, node_b2a, "segs_cum_acked", "",
+                     pab->rtt_cumack, pba->rtt_cumack);
+    InsertJsonNumber(node_a2b, node_b2a, "duplicate_acks", "",
+                     pab->rtt_dupack, pba->rtt_dupack);
+    InsertJsonNumber(node_a2b, node_b2a, "triple_dupacks", "",
+                     pab->rtt_triple_dupack, pba->rtt_triple_dupack);
+    InsertJsonNumber(node_a2b, node_b2a, "unknown_acks:", "",
+                     pab->rtt_unkack, pba->rtt_unkack);
+    InsertJsonNumber(node_a2b, node_b2a, "max_retrans", "",
+                     pab->retr_max, pba->retr_max);
+    InsertJsonNumber(node_a2b, node_b2a, "min_retr_time", "ms",
+                     ((double)pab->retr_min_tm / 1000.0),
+                     ((double)pba->retr_min_tm / 1000.0));
+    InsertJsonNumber(node_a2b, node_b2a, "max_retr_time", "ms",
+                     ((double)pab->retr_max_tm / 1000.0),
+                     ((double)pba->retr_max_tm / 1000.0));
+    InsertJsonNumber(node_a2b, node_b2a, "avg_retr_time", "ms",
+                     Average(pab->retr_tm_sum, (int)pab->retr_tm_count) / 1000.0,
+                     Average(pba->retr_tm_sum, (int)pba->retr_tm_count) / 1000.0);
+    InsertJsonNumber(node_a2b, node_b2a, "sdv_retr_time", "ms",
+                     Stdev(pab->retr_tm_sum, pab->retr_tm_sum2,
+                           (int)pab->retr_tm_count) / 1000.0,
+                     Stdev(pba->retr_tm_sum, pba->retr_tm_sum2,
+                           (int)pba->retr_tm_count) / 1000.0);
+
+    return json_root;
+}
 
 void
 PrintTrace(

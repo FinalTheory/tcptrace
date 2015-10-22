@@ -78,7 +78,14 @@ DoThru(
 	ptcb->thru_lasttime = current_time;
 	ptcb->thru_pkts = 1;
 	ptcb->thru_bytes = nbytes;
-	
+
+	if (dump_json) {
+		ptcb->thru_time_data = cJSON_CreateArray();
+		ptcb->thru_avg_data = cJSON_CreateArray();
+		ptcb->thru_inst_data = cJSON_CreateArray();
+		ptcb->thru_points_time = cJSON_CreateArray();
+		ptcb->thru_points_data = cJSON_CreateArray();
+	}
 
 	/* bug fix from Michele Clark - UNC */
 	if (&ptcb->ptp->a2b == ptcb) {
@@ -124,6 +131,13 @@ DoThru(
 	/* instantaneous plot */
 	extend_line(ptcb->thru_inst_line,
 		     current_time, (int) thruput);
+	if (dump_json) {
+		cJSON_AddItemToArray(ptcb->thru_time_data,
+							 cJSON_CreateNumber(current_time.tv_sec +
+												current_time.tv_usec / 1000000.0));
+		cJSON_AddItemToArray(ptcb->thru_inst_data,
+							 cJSON_CreateNumber(thruput));
+	}
 
 	/* compute stats for connection lifetime */
 	etime = elapsed(ptcb->ptp->first_time,current_time);
@@ -134,6 +148,10 @@ DoThru(
 	/* long-term average */
 	extend_line(ptcb->thru_avg_line,
 		     current_time, (int) thruput);
+	if (dump_json) {
+		cJSON_AddItemToArray(ptcb->thru_avg_data,
+							 cJSON_CreateNumber(thruput));
+	}
 
 	/* reset stats for this interval */
 	ptcb->thru_firsttime = current_time;
@@ -142,11 +160,18 @@ DoThru(
     }
 
     /* immediate value in yellow ticks */
-    if (plot_tput_instant) {
 	etime = elapsed(ptcb->thru_lasttime,current_time);
 	if (etime == 0.0)
-	    etime = 1000;	/* ick, what if "no time" has passed?? */
+		etime = 1000;	/* ick, what if "no time" has passed?? */
 	thruput = (double) nbytes / ((double) etime / 1000000.0);
+	if (dump_json) {
+		cJSON_AddItemToArray(ptcb->thru_points_time,
+							 cJSON_CreateNumber(current_time.tv_sec +
+												current_time.tv_usec / 1000000.0));
+		cJSON_AddItemToArray(ptcb->thru_points_data,
+							 cJSON_CreateNumber(thruput));
+	}
+    if (plot_tput_instant) {
 	plotter_temp_color(ptcb->thru_plotter,"yellow");
 	plotter_dot(ptcb->thru_plotter,
 		    current_time, (int) thruput);

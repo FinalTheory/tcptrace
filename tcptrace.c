@@ -125,6 +125,7 @@ Bool warn_printbad_syn_fin_seq = FALSE;
 Bool docheck_hw_dups = TRUE;
 Bool save_tcp_data = FALSE;
 Bool graph_time_zero = FALSE;
+Bool dump_json = FALSE;
 Bool graph_seq_zero = FALSE;
 Bool print_seq_zero = FALSE;
 Bool graph_zero_len_pkts = TRUE;
@@ -2190,6 +2191,8 @@ ParseArgs(
 		      }
  }*/		      *(argv[i]+1) = '\00'; 
 		     break;
+          //TODO: 支持自定义名称
+          case 'j': dump_json = TRUE; break;
 		  case 'l': printbrief = FALSE; break;
 		  case 'm':
 		    BadArg(argsource,

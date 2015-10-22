@@ -109,6 +109,9 @@ static char const GCC_UNUSED rcsid_tcptrace[] =
 /* memory allocation routines */
 #include "pool.h"
 
+/* use for dump json data */
+#include "cJSON/cJSON.h"
+
 /* we want LONG LONG in some places */
 #if SIZEOF_UNSIGNED_LONG_LONG_INT >= 8
 #define HAVE_LONG_LONG
@@ -441,6 +444,11 @@ typedef struct tcb {
     timeval	thru_lasttime;	/* time of previous segment */
     PLINE	thru_avg_line;	/* average throughput line */
     PLINE	thru_inst_line;	/* instantaneous throughput line */
+    cJSON *thru_time_data;
+    cJSON *thru_avg_data;
+    cJSON *thru_inst_data;
+    cJSON *thru_points_time;
+    cJSON *thru_points_data;
 
     /* data transfer time stamps - mallman */
     timeval	first_data_time;
@@ -711,6 +719,7 @@ extern Bool show_triple_dupack;
 extern Bool show_zwnd_probes;
 extern Bool use_short_names;
 extern Bool save_tcp_data;
+extern Bool dump_json;
 extern Bool graph_time_zero;
 extern Bool graph_seq_zero;
 extern Bool print_seq_zero;
