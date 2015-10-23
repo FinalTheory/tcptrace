@@ -413,7 +413,15 @@ DumpJson(tcp_pair *ptp) {
     etime_data2 = elapsed(pba->first_data_time,
                           pba->last_data_time); /* in usecs */
 
-    InsertJsonNumber(node_a2b, node_b2a, "data_xmit_time", "secs",
+    InsertJsonNumber(node_a2b, node_b2a, "first_data_time", "secs",
+                     (pab->first_data_time.tv_sec + pab->first_data_time.tv_usec / 1000000.),
+                     (pba->first_data_time.tv_sec + pba->first_data_time.tv_usec / 1000000.));
+
+    InsertJsonNumber(node_a2b, node_b2a, "last_data_time", "secs",
+                     (pab->last_data_time.tv_sec + pab->last_data_time.tv_usec / 1000000.),
+                     (pba->last_data_time.tv_sec + pba->last_data_time.tv_usec / 1000000.));
+
+    InsertJsonNumber(node_a2b, node_b2a, "data_trans_time", "secs",
                      etime_data1 / 1000000.0,
                      etime_data2 / 1000000.0);
 
