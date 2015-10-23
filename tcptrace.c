@@ -165,6 +165,7 @@ char *output_file_prefix = NULL;
 char *xplot_title_prefix = NULL;
 char *xplot_args = NULL;
 char *sv = NULL;
+char *json_name = NULL;
 /* globals */
 struct timeval current_time;
 int num_modules = 0;
@@ -2133,6 +2134,15 @@ ParseArgs(
 		    graph_segsize = TRUE;
 		    graph_tline = TRUE;
 		    break;
+          case 'J':
+              dump_json = TRUE;
+              size_t len = strlen(argv[i] + 1);
+              if (len) {
+                  json_name = strdup(argv[i] + 1);
+              } else {
+                  json_name = "connections.json";
+              }
+              *(argv[i]+1) = '\00'; break;
 		  case 'L': graph_tline = TRUE;
 		    fprintf(stderr, "\nWarning: You have chosen the option '-L' to plot Time Line Graphs.\n         This option is yet under development and may not reflect accurate results.\n         Please take a look at the file README.tline_graphs for more details.\n\n");
 		    break;
@@ -2191,8 +2201,6 @@ ParseArgs(
 		      }
  }*/		      *(argv[i]+1) = '\00'; 
 		     break;
-          //TODO: 支持自定义名称
-          case 'j': dump_json = TRUE; break;
 		  case 'l': printbrief = FALSE; break;
 		  case 'm':
 		    BadArg(argsource,

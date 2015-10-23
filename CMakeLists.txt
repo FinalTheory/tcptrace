@@ -107,7 +107,7 @@ add_definitions(
 
         -DBUILT_USER="huangyan13@baidu.com"
         -DBUILT_DATE="2015-10"
-        -DBUILT_HOST="Baidu Inc."
+        -DBUILT_HOST="MacBookPro"
 )
 
 include_directories(.)

@@ -68,11 +68,9 @@ DoThru(
 {
     double etime;
     double thruput;
-    char *myname, *hisname;
 
     /* init, if not already done */
     if (ZERO_TIME(&ptcb->thru_firsttime)) {
-	char title[210];
 
 	ptcb->thru_firsttime = current_time;
 	ptcb->thru_lasttime = current_time;
@@ -85,32 +83,34 @@ DoThru(
 		ptcb->thru_inst_data = cJSON_CreateArray();
 		ptcb->thru_points_time = cJSON_CreateArray();
 		ptcb->thru_points_data = cJSON_CreateArray();
-	}
-
-	/* bug fix from Michele Clark - UNC */
-	if (&ptcb->ptp->a2b == ptcb) {
-	    myname = ptcb->ptp->a_endpoint;
-	    hisname = ptcb->ptp->b_endpoint;
 	} else {
-	    myname = ptcb->ptp->b_endpoint;
-	    hisname = ptcb->ptp->a_endpoint;
-	}
-	/* create the plotter file */
-	snprintf(title,sizeof(title),"%s_==>_%s (throughput)",
-		myname, hisname);
-	ptcb->thru_plotter = new_plotter(ptcb,NULL,title,
-					 "time","thruput (bytes/sec)",
-					 THROUGHPUT_FILE_EXTENSION);
-	if (graph_time_zero) {
-	    /* set graph zero points */
-	    plotter_nothing(ptcb->thru_plotter, current_time);
-	}
+		char title[210];
+		char *myname, *hisname;
+		/* bug fix from Michele Clark - UNC */
+		if (&ptcb->ptp->a2b == ptcb) {
+			myname = ptcb->ptp->a_endpoint;
+			hisname = ptcb->ptp->b_endpoint;
+		} else {
+			myname = ptcb->ptp->b_endpoint;
+			hisname = ptcb->ptp->a_endpoint;
+		}
+		/* create the plotter file */
+		snprintf(title,sizeof(title),"%s_==>_%s (throughput)",
+				 myname, hisname);
+		ptcb->thru_plotter = new_plotter(ptcb,NULL,title,
+										 "time","thruput (bytes/sec)",
+										 THROUGHPUT_FILE_EXTENSION);
+		if (graph_time_zero) {
+			/* set graph zero points */
+			plotter_nothing(ptcb->thru_plotter, current_time);
+		}
 
-	/* create lines for average and instantaneous values */
-	ptcb->thru_avg_line =
-	    new_line(ptcb->thru_plotter, "avg. tput", "blue");
-	ptcb->thru_inst_line =
-	    new_line(ptcb->thru_plotter, "inst. tput", "red");
+		/* create lines for average and instantaneous values */
+		ptcb->thru_avg_line =
+				new_line(ptcb->thru_plotter, "avg. tput", "blue");
+		ptcb->thru_inst_line =
+				new_line(ptcb->thru_plotter, "inst. tput", "red");
+	}
 
 	return;
     }
@@ -128,15 +128,16 @@ DoThru(
 	    etime = 1000;	/* ick, what if "no time" has passed?? */
 	thruput = (double) ptcb->thru_bytes / ((double) etime / 1000000.0);
 
-	/* instantaneous plot */
-	extend_line(ptcb->thru_inst_line,
-		     current_time, (int) thruput);
 	if (dump_json) {
 		cJSON_AddItemToArray(ptcb->thru_time_data,
 							 cJSON_CreateNumber(current_time.tv_sec +
 												current_time.tv_usec / 1000000.0));
 		cJSON_AddItemToArray(ptcb->thru_inst_data,
 							 cJSON_CreateNumber(thruput));
+	} else {
+		/* instantaneous plot */
+		extend_line(ptcb->thru_inst_line,
+					current_time, (int) thruput);
 	}
 
 	/* compute stats for connection lifetime */
@@ -145,12 +146,13 @@ DoThru(
 	    etime = 1000;	/* ick, what if "no time" has passed?? */
 	thruput = (double) ptcb->data_bytes / ((double) etime / 1000000.0);
 
-	/* long-term average */
-	extend_line(ptcb->thru_avg_line,
-		     current_time, (int) thruput);
 	if (dump_json) {
 		cJSON_AddItemToArray(ptcb->thru_avg_data,
 							 cJSON_CreateNumber(thruput));
+	} else {
+		/* long-term average */
+		extend_line(ptcb->thru_avg_line,
+					current_time, (int) thruput);
 	}
 
 	/* reset stats for this interval */
@@ -170,12 +172,13 @@ DoThru(
 												current_time.tv_usec / 1000000.0));
 		cJSON_AddItemToArray(ptcb->thru_points_data,
 							 cJSON_CreateNumber(thruput));
+	} else {
+		if (plot_tput_instant) {
+			plotter_temp_color(ptcb->thru_plotter,"yellow");
+			plotter_dot(ptcb->thru_plotter,
+						current_time, (u_llong)thruput);
+		}
 	}
-    if (plot_tput_instant) {
-	plotter_temp_color(ptcb->thru_plotter,"yellow");
-	plotter_dot(ptcb->thru_plotter,
-		    current_time, (int) thruput);
-    }
 
     /* add in the latest packet */
     ptcb->thru_lasttime = current_time;

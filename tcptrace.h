@@ -755,7 +755,7 @@ extern char *xplot_title_prefix;
 extern char *xplot_args;
 extern char *sv;
 extern char *sp;       /* Separator used for long output with <SP>-separated-values */
-
+extern char *json_name;
 /* Used to comment out header lines of the long output
  * when <SP>-separated-values is requested
  */

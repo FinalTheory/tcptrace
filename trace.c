@@ -2611,9 +2611,13 @@ trace_done(void)
             cJSON_AddItemToArray(array, DumpJson(ptp));
         }
         char *raw_json = cJSON_Print(array);
-        FILE *fp = fopen("connections.json", "w");
-        fwrite(raw_json, 1, strlen(raw_json), fp);
-        fclose(fp);
+        FILE *fp = fopen(json_name, "w");
+        if (fp != NULL) {
+            fwrite(raw_json, 1, strlen(raw_json), fp);
+            fclose(fp);
+        } else {
+            perror("Could not create json file");
+        }
     }
   if (!run_continuously) {
     /* print each connection */
