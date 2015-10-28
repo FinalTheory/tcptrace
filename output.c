@@ -53,7 +53,7 @@
  *		http://www.tcptrace.org/
  */
 #include "tcptrace.h"
-#include "cJSON/cJSON.h"
+#include "base64/base64.h"
 static char const GCC_UNUSED copyright[] =
     "@(#)Copyright (c) 2004 -- Ohio University.\n";
 static char const GCC_UNUSED rcsid[] =
@@ -214,6 +214,37 @@ InsertJsonBool(cJSON *node_a2b, cJSON *node_b2a, char *name, char *unit, int a2b
     cJSON_AddBoolToObject(node_b2a, name, b2a);
 }
 
+
+static char *File2Base64(FILE *fp) {
+    if (fp == NULL || fp == (FILE *)-1) {
+        printf("%p\n", fp);
+        return NULL;
+    }
+    fflush(fp);
+    if (fseek(fp, 0L, SEEK_END) != 0) {
+        perror("fseek failed");
+        return NULL;
+    }
+    long file_size = ftell(fp);
+    if (file_size == -1) {
+        perror("ftell failed");
+        return NULL;
+    }
+    rewind(fp);
+    char *raw_data = malloc((size_t)file_size + 1);
+    char *base64_data = malloc((size_t)Base64encode_len((int)file_size));
+    if (raw_data == NULL) {
+        perror("malloc failed");
+        return NULL;
+    }
+    fread(raw_data, 1, (size_t)file_size, fp);
+    Base64encode(base64_data, raw_data, (int)file_size);
+    free(raw_data);
+    fclose(fp);
+    return base64_data;
+}
+
+
 cJSON *
 DumpJson(tcp_pair *ptp) {
     double etime;
@@ -264,6 +295,19 @@ DumpJson(tcp_pair *ptp) {
         cJSON_AddItemToObject(node_b2a, "instant", pba->thru_inst_data);
         cJSON_AddItemToObject(node_b2a, "points_data", pba->thru_points_data);
         cJSON_AddItemToObject(node_b2a, "points_time", pba->thru_points_time);
+    }
+
+    if (save_tcp_data) {
+        char *a2b_data = File2Base64(pab->extr_contents_tmpfile);
+        char *b2a_data = File2Base64(pba->extr_contents_tmpfile);
+        if (a2b_data != NULL) {
+            cJSON_AddStringToObject(node_a2b, "base64_data", a2b_data);
+            free(a2b_data);
+        }
+        if (b2a_data != NULL) {
+            cJSON_AddStringToObject(node_b2a, "base64_data", b2a_data);
+            free(b2a_data);
+        }
     }
 
     InsertJsonNumber(node_a2b, node_b2a, "packets_sent", "", pab->packets, pba->packets);

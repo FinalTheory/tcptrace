@@ -465,6 +465,7 @@ typedef struct tcb {
     MFILE	*rtt_dump_file;
 
     /* Extracted stream contents */
+    FILE *extr_contents_tmpfile;
     MFILE	*extr_contents_file;
     u_llong	trunc_bytes;	/* data bytes not see due to trace file truncation */
     u_llong	trunc_segs;	/* segments with trunc'd bytes */
@@ -820,6 +821,7 @@ void plot_init(void);
 tcp_pair *dotrace(struct ip *, struct tcphdr *ptcp, void *plast);
 void PrintRawData(char *label, void *pfirst, void *plast, Bool octal);
 void PrintRawDataHex(char *label, void *pfirst, void *plast);
+cJSON * DumpJson(tcp_pair *ptp);
 void PrintTrace(tcp_pair *);
 void UDPPrintTrace(udp_pair *);
 void PrintSVHeader(void);

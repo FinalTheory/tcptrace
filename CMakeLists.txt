@@ -71,6 +71,8 @@ set(SOURCE_FILES
     udp.c
     version.c
     version.h
+    base64/base64.c
+    base64/base64.h
 )
 
 add_definitions(

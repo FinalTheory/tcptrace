@@ -89,6 +89,8 @@ static tcp_pair *FindTTP(struct ip *, struct tcphdr *, int *, ptp_ptr **);
 static void MoreTcpPairs(int num_needed);
 static void ExtractContents(u_long seq, u_long tcp_data_bytes,
 			    u_long saved_data_bytes, void *pdata, tcb *ptcb);
+static void DumpJsonContents(u_long seq, u_long tcp_data_bytes,
+                            u_long saved_data_bytes, void *pdata, tcb *ptcb);
 static Bool check_hw_dups(u_short id, seqnum seq, tcb *ptcb);
 static u_long SeqRep(tcb *ptcb, u_long seq);
 static void UpdateConnLists(ptp_ptr *tcp_ptr, struct tcphdr *ptcp);
@@ -1737,8 +1739,13 @@ dotrace(
 	    ++thisdir->trunc_segs;
 	}
 
-	if (save_tcp_data)
-	    ExtractContents(start,tcp_data_length,saved,pdata,thisdir);
+	if (save_tcp_data) {
+        if (!dump_json) {
+            ExtractContents(start,(u_long)tcp_data_length,saved,pdata,thisdir);
+        } else {
+            DumpJsonContents(start,(u_long)tcp_data_length,saved,pdata,thisdir);
+        }
+    }
     }
 
     /* do rexmit stats */
@@ -2604,7 +2611,6 @@ trace_done(void)
       }
     }
     if (dump_json) {
-        cJSON * DumpJson(tcp_pair *ptp);
         cJSON *array = cJSON_CreateArray();
         for (ix = 0; ix <= num_tcp_pairs; ++ix) {
             ptp = ttp[ix];
@@ -3146,6 +3152,97 @@ ExtractContents(
     }
 }
 
+
+static void DumpJsonContents(
+        u_long seq,
+        u_long tcp_data_bytes,
+        u_long saved_data_bytes,
+        void *pdata,
+        tcb *ptcb) {
+    u_long missing;
+    long offset;
+    long fptr;
+
+    if (saved_data_bytes == 0) {
+        return;
+    }
+
+    /* how many bytes do we have? */
+    missing = tcp_data_bytes - saved_data_bytes;
+    if (missing > 0) {
+        fprintf(stderr, "ExtractContents: missing %ld bytes (%ld-%ld)\n",
+                missing, tcp_data_bytes, saved_data_bytes);
+    }
+
+    /* if the FILE is "-1", couldn't open file */
+    if (ptcb->extr_contents_tmpfile == (FILE *)-1) {
+        return;
+    }
+
+    /* if the FILE is NULL, open file */
+    if (ptcb->extr_contents_tmpfile == (FILE *)NULL) {
+        FILE *f;
+
+        if ((f = tmpfile()) == NULL) {
+            perror("open temp file error");
+            ptcb->extr_contents_tmpfile = (FILE *)-1;
+        }
+
+        ptcb->extr_contents_tmpfile = f;
+
+        if (ptcb->syn_count == 0) {
+            /* we haven't seen the SYN.  This is bad because we can't tell */
+            /* if there is data BEFORE this, which makes it tough to store */
+            /* the file.  Let's be optimistic and hope we don't see */
+            /* anything before this point.  Otherwise, we're stuck */
+            ptcb->extr_lastseq = (seqnum)seq;
+        } else {
+            /* beginning of the file is the data just past the SYN */
+            ptcb->extr_lastseq = ptcb->syn + 1;
+        }
+        /* in any case, anything before HERE is illegal (fails for very */
+        /* long files - FIXME */
+        ptcb->extr_initseq = ptcb->extr_lastseq;
+    }
+
+    /* it's illegal for the bytes to be BEFORE extr_initseq unless the file */
+    /* is "really long" (seq space has wrapped around) - FIXME(ugly) */
+    if ((SEQCMP(seq, ptcb->extr_initseq) < 0) &&
+        (ptcb->data_bytes < (0xffffffff / 2))) {
+        /* if we haven't (didn't) seen the SYN, then can't do this!! */
+        fprintf(stderr,
+                "ExtractContents: skipping data, preceeds first segment\n");
+        fprintf(stderr, "\t and I didnt' see the SYN\n");
+        return;
+    }
+
+    /* see where we should start writing */
+    /* a little complicated, because we want to support really long files */
+    offset = SEQCMP(seq, ptcb->extr_lastseq);
+
+    /* seek to the correct place in the file */
+    if (fseek(ptcb->extr_contents_tmpfile, offset, SEEK_CUR) == -1) {
+        perror("fseek");
+        exit(-1);
+    }
+
+    /* see where we are */
+    fptr = ftell(ptcb->extr_contents_tmpfile);
+
+    /* store the bytes */
+    if (fwrite(pdata, 1, saved_data_bytes, ptcb->extr_contents_tmpfile)
+        != saved_data_bytes) {
+        perror("fwrite");
+        exit(-1);
+    }
+
+    /* go back to where we started to not confuse the next write */
+    ptcb->extr_lastseq = (seqnum)seq;
+    if (fseek(ptcb->extr_contents_tmpfile, fptr, SEEK_SET) == -1) {
+        perror("fseek 2");
+        exit(-1);
+    }
+}
 
 /* check for not-uncommon error of hardware-level duplicates
    (same IP ID and TCP sequence number) */
