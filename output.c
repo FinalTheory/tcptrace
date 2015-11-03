@@ -262,8 +262,8 @@ DumpJson(tcp_pair *ptp) {
     cJSON_AddStringToObject(json_root, "filename", ptp->filename);
     cJSON_AddStringToObject(json_root, "host_a", ptp->a_hostname);
     cJSON_AddStringToObject(json_root, "host_b", ptp->b_hostname);
-    cJSON_AddStringToObject(json_root, "port_a", ptp->a_portname);
-    cJSON_AddStringToObject(json_root, "port_b", ptp->b_portname);
+    cJSON_AddNumberToObject(json_root, "port_a", atoi(ptp->a_portname));
+    cJSON_AddNumberToObject(json_root, "port_b", atoi(ptp->b_portname));
     cJSON_AddStringToObject(json_root, "complete",
                             ConnReset(ptp) ? "reset" : (ConnComplete(ptp) ? "yes" : "no"));
 
@@ -371,7 +371,7 @@ DumpJson(tcp_pair *ptp) {
     }
 
     InsertJsonNumber(node_a2b, node_b2a, "max_owin", "bytes", pab->owin_max, pba->owin_max);
-    InsertJsonNumber(node_a2b, node_b2a, "min_non-zero_owin", "bytes", pab->owin_min, pba->owin_min);
+    InsertJsonNumber(node_a2b, node_b2a, "min_non_zero_owin", "bytes", pab->owin_min, pba->owin_min);
     InsertJsonNumber(node_a2b, node_b2a, "avg_owin", "bytes",
                      pab->owin_count == 0 ? 0 : pab->owin_tot / pab->owin_count,
                      pba->owin_count == 0 ? 0 : pba->owin_tot / pba->owin_count);
@@ -512,7 +512,7 @@ DumpJson(tcp_pair *ptp) {
     InsertJsonNumber(node_a2b, node_b2a, "RTT_full_sz_stdev", "ms",
                      Stdev(pab->rtt_full_sum, pab->rtt_full_sum2, (int)pab->rtt_full_count) / 1000.0,
                      Stdev(pba->rtt_full_sum, pba->rtt_full_sum2, (int)pba->rtt_full_count) / 1000.0);
-    InsertJsonNumber(node_a2b, node_b2a, "post-loss_acks", "",
+    InsertJsonNumber(node_a2b, node_b2a, "post_loss_acks", "",
                      pab->rtt_nosample, pba->rtt_nosample);
     if (pab->rtt_amback || pba->rtt_amback || csv || tsv || (sv != NULL)) {
         InsertJsonNumber(node_a2b, node_b2a, "ambiguous_acks", "",
