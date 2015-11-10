@@ -444,9 +444,6 @@ typedef struct tcb {
     timeval	thru_lasttime;	/* time of previous segment */
     PLINE	thru_avg_line;	/* average throughput line */
     PLINE	thru_inst_line;	/* instantaneous throughput line */
-    cJSON *thru_time_data;
-    cJSON *thru_avg_data;
-    cJSON *thru_inst_data;
     cJSON *thru_points_time;
     cJSON *thru_points_data;
 

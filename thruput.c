@@ -78,9 +78,6 @@ DoThru(
 	ptcb->thru_bytes = nbytes;
 
 	if (dump_json) {
-		ptcb->thru_time_data = cJSON_CreateArray();
-		ptcb->thru_avg_data = cJSON_CreateArray();
-		ptcb->thru_inst_data = cJSON_CreateArray();
 		ptcb->thru_points_time = cJSON_CreateArray();
 		ptcb->thru_points_data = cJSON_CreateArray();
 	} else {
@@ -128,13 +125,7 @@ DoThru(
 	    etime = 1000;	/* ick, what if "no time" has passed?? */
 	thruput = (double) ptcb->thru_bytes / ((double) etime / 1000000.0);
 
-	if (dump_json) {
-		cJSON_AddItemToArray(ptcb->thru_time_data,
-							 cJSON_CreateNumber(current_time.tv_sec +
-												current_time.tv_usec / 1000000.0));
-		cJSON_AddItemToArray(ptcb->thru_inst_data,
-							 cJSON_CreateNumber(thruput));
-	} else {
+	if (!dump_json) {
 		/* instantaneous plot */
 		extend_line(ptcb->thru_inst_line,
 					current_time, (int) thruput);
@@ -146,10 +137,7 @@ DoThru(
 	    etime = 1000;	/* ick, what if "no time" has passed?? */
 	thruput = (double) ptcb->data_bytes / ((double) etime / 1000000.0);
 
-	if (dump_json) {
-		cJSON_AddItemToArray(ptcb->thru_avg_data,
-							 cJSON_CreateNumber(thruput));
-	} else {
+	if (!dump_json) {
 		/* long-term average */
 		extend_line(ptcb->thru_avg_line,
 					current_time, (int) thruput);
@@ -161,18 +149,19 @@ DoThru(
 	ptcb->thru_bytes = 0;
     }
 
-    /* immediate value in yellow ticks */
-	etime = elapsed(ptcb->thru_lasttime,current_time);
-	if (etime == 0.0)
-		etime = 1000;	/* ick, what if "no time" has passed?? */
-	thruput = (double) nbytes / ((double) etime / 1000000.0);
+	// just record all data points
 	if (dump_json) {
 		cJSON_AddItemToArray(ptcb->thru_points_time,
 							 cJSON_CreateNumber(current_time.tv_sec +
 												current_time.tv_usec / 1000000.0));
 		cJSON_AddItemToArray(ptcb->thru_points_data,
-							 cJSON_CreateNumber(thruput));
+							 cJSON_CreateNumber(nbytes));
 	} else {
+		/* immediate value in yellow ticks */
+		etime = elapsed(ptcb->thru_lasttime,current_time);
+		if (etime == 0.0)
+			etime = 1000;	/* ick, what if "no time" has passed?? */
+		thruput = (double) nbytes / ((double) etime / 1000000.0);
 		if (plot_tput_instant) {
 			plotter_temp_color(ptcb->thru_plotter,"yellow");
 			plotter_dot(ptcb->thru_plotter,

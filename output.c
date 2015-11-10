@@ -284,15 +284,9 @@ DumpJson(tcp_pair *ptp) {
     cJSON_AddItemToObject(json_root, "b2a", node_b2a);
 
     if (graph_tput) {
-        cJSON_AddItemToObject(node_a2b, "time", pab->thru_time_data);
-        cJSON_AddItemToObject(node_a2b, "average", pab->thru_avg_data);
-        cJSON_AddItemToObject(node_a2b, "instant", pab->thru_inst_data);
         cJSON_AddItemToObject(node_a2b, "points_data", pab->thru_points_data);
         cJSON_AddItemToObject(node_a2b, "points_time", pab->thru_points_time);
 
-        cJSON_AddItemToObject(node_b2a, "time", pba->thru_time_data);
-        cJSON_AddItemToObject(node_b2a, "average", pba->thru_avg_data);
-        cJSON_AddItemToObject(node_b2a, "instant", pba->thru_inst_data);
         cJSON_AddItemToObject(node_b2a, "points_data", pba->thru_points_data);
         cJSON_AddItemToObject(node_b2a, "points_time", pba->thru_points_time);
     }
