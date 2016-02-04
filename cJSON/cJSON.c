@@ -142,7 +142,7 @@ static int update(printbuffer *p) {
 static char *print_number(cJSON *item, printbuffer *p) {
     char *str = 0;
     double d = item->valuedouble;
-    if (isnan(d)) {
+    if (isnan(d) || isinf(d)) {
         if (p) str = ensure(p, 4);
         else str = (char *) cJSON_malloc(4);    /* special case for 0. */
         if (str) strcpy(str, "NaN");
